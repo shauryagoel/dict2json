@@ -1,5 +1,27 @@
-use dict2json::convert;
+use dict2json::{convert, convert_exact};
 use serde_json::{Value, json};
+
+#[test]
+fn exact_preserves_valid_json_and_only_converts_python() {
+    for input in [
+        " \r\n{\"a\":1e400,\"a\":-0,\"u\":\"\\ud800\",\"n\":1.00}\t ",
+        r#"["comma, quote\" and slash\\",{"a":1,"b":2}]"#,
+        "{}",
+        "[]",
+        "1e400",
+        "-0",
+        "true",
+        "false",
+        "null",
+        "\"hello\"",
+    ] {
+        assert_eq!(convert_exact(input).unwrap(), input);
+    }
+    assert_eq!(
+        convert_exact("{'a': True, 'b': (None, {'x': 1, 'y': 2})}").unwrap(),
+        r#"{"a":true,"b":[null,{"x":1,"y":2}]}"#
+    );
+}
 
 #[test]
 fn converts_the_supplied_example_in_order() {
@@ -96,6 +118,7 @@ fn rejects_unsupported_or_malformed_input() {
         "{'x': '\\ud800'}",
     ] {
         assert!(convert(input).is_err(), "accepted {input:?}");
+        assert!(convert_exact(input).is_err(), "exact accepted {input:?}");
     }
 }
 
@@ -163,15 +186,19 @@ fn guards_resource_limits_and_long_expressions() {
     assert!(convert(&at_limit).is_ok());
     let too_deep = format!("{{'x': {}0{}}}", "[".repeat(64), "]".repeat(64));
     assert!(convert(&too_deep).is_err());
+    assert!(convert_exact(&too_deep).is_err());
     for expression in ["-".repeat(10_000) + "1", "1+".repeat(10_000) + "1"] {
         assert!(convert(&format!("{{'x': {expression}}}")).is_err());
     }
     assert!(convert(&" ".repeat(dict2json::MAX_INPUT_BYTES + 1)).is_err());
+    assert!(convert_exact(&" ".repeat(dict2json::MAX_INPUT_BYTES + 1)).is_err());
     let deep_json = "[".repeat(10_000) + "0" + &"]".repeat(10_000);
     assert_eq!(convert(&deep_json).unwrap(), deep_json);
+    assert_eq!(convert_exact(&deep_json).unwrap(), deep_json);
     let deep_json = "[".repeat(10_000) + r#"{"x":1,"y":2}"# + &"]".repeat(10_000);
     let expected = "[".repeat(10_000) + r#"{"x":1, "y":2}"# + &"]".repeat(10_000);
     assert_eq!(convert(&deep_json).unwrap(), expected);
+    assert_eq!(convert_exact(&deep_json).unwrap(), deep_json);
 }
 
 #[test]

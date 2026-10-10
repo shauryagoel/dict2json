@@ -3,12 +3,18 @@
 Build a standalone Rust CLI named `dict2json` that converts a Python dictionary
 literal into one JSON string. Python is not required at runtime.
 
-- Accept exactly one input argument, or read the entire UTF-8 stdin stream.
+- Accept exactly one input argument, read a UTF-8 file with `--file PATH`, or read
+  the entire UTF-8 stdin stream. Reject multiple explicit input sources or repeated
+  file options. With an argument or file, ignore stdin.
 - Use one space after commas between object key–value pairs, including nested
-  objects, with no added trailing space. Apply this to Python conversions and
-  valid JSON. For valid JSON, preserve every other byte, including string contents,
-  array separators, numbers, duplicate keys, and key order. Any JSON value is
-  accepted, including arrays and scalars.
+  objects, with no added trailing space, by default. Apply this to Python
+  conversions and valid JSON. For valid JSON, preserve every other byte, including
+  string contents, array separators, numbers, duplicate keys, and key order. Any
+  JSON value is accepted, including arrays and scalars.
+- Accept `--exact` before or after the input source. Preserve valid JSON byte for
+  byte, including leading/trailing whitespace and newlines. Convert Python
+  dictionaries to compact JSON when `--exact` is used; all input validation and
+  resource limits still apply.
 - Otherwise accept a Python dictionary with string keys. Support nested
   dictionaries, lists, tuples (JSON arrays), strings, integers, finite floats,
   `True`, `False`, and `None`. Keep dictionary insertion order and use the last
@@ -20,6 +26,8 @@ literal into one JSON string. Python is not required at runtime.
   resource use. Invalid input produces a nonzero exit status, an explanatory
   message on stderr, and no stdout. Write no extra newline.
 - Provide `--help` and `--version`, using Rust's standard argument/I/O APIs.
+  Preserve `-` for stdin and `-- INPUT` for stopping option parsing, and accept
+  negative JSON numbers as positional input. Never modify the source file.
 
 Use RustPython's lexer/parser for Python syntax and string decoding, and
 `serde_json` for JSON validation and encoding. Preflight Python tokens before
@@ -45,9 +53,11 @@ python3 tests/differential.py target/release/dict2json
 
 Use standard Rust formatting and explicit `Result` errors at input boundaries.
 Every successful conversion must decode as JSON and retain the expected data;
-JSON input must remain unchanged except for object separator spacing. Test the
-supplied timestamp example, Unicode and escape forms, numeric boundaries,
-nesting, malformed/unsupported inputs, stdin and arguments, exit codes, and
+JSON input must remain unchanged except for default object separator spacing,
+and must be identical with `--exact`. Test the supplied timestamp example,
+Unicode and escape forms, numeric boundaries,
+nesting, malformed/unsupported inputs, files/stdin/arguments, option combinations,
+negative JSON arguments, file read errors and limits, exit codes, and
 deterministic generated cases.
 Do not change existing agent configuration, publish, or merge as part of this
 task.

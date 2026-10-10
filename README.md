@@ -1,10 +1,11 @@
 # dict2json
 
 A Rust CLI that safely converts Python dictionary literals into JSON, with one
-space after commas between object key–value pairs and no added trailing space.
-Already-valid JSON uses the same spacing. All other input bytes are preserved,
+space after commas between object key–value pairs by default and no added trailing
+space. Already-valid JSON uses the same spacing. All other input bytes are preserved,
 including string contents, array separators, key order, duplicate keys, and
-number formatting. Python is not needed to run it.
+number formatting. Use `--exact` to preserve already-valid JSON byte for byte.
+Python is not needed to run it.
 
 ## Build and install
 
@@ -44,11 +45,33 @@ EOF
 dict2json < input.txt
 ```
 
-No argument, or `-`, reads the entire stdin stream as one value. `--help` and
-`--version` print usage and version information. Output has no added newline.
+Read input directly from a file with `--file <path>`:
+
+```sh
+dict2json --file input.txt
+```
+
+Add `--exact` to preserve valid JSON exactly, including whitespace and newlines:
+
+```sh
+dict2json --exact --file input.json
+dict2json --exact '{"a":1,"b":2}'
+dict2json --exact < input.json
+```
+
+When `--exact` receives a Python dictionary, it still converts the literal to
+JSON, using compact output without added separator spaces. `--exact` may appear
+before or after the input argument or file option. File input uses the same
+UTF-8 requirement and 16 MiB size limit as stdin; the source file is never changed.
+Choose one input source: an argument, a file, or stdin.
+
+No argument, or `-`, reads the entire stdin stream as one value. Use `--` before
+an input argument to stop option parsing. `--help` and `--version` print usage and
+version information. Output has no added newline.
 Object separator spacing also applies to nested objects; array separators and
 commas inside strings keep their existing formatting. For valid JSON, whitespace
-immediately after an object separator comma is replaced by one space.
+immediately after an object separator comma is replaced by one space unless
+`--exact` is used.
 
 ## Supported input
 
@@ -91,9 +114,10 @@ python3 tests/differential.py target/release/dict2json
 ```
 
 Rust tests cover conversion, 2,000 generated dictionaries, input limits,
-malformed source, stdin/arguments, object spacing, JSON data preservation, and
-CLI error paths. The optional Python standard-library suite runs over 3,000
-additional CLI cases, comparing conversions against `ast.literal_eval` and
+malformed source, files/stdin/arguments, object spacing, exact JSON preservation,
+negative numeric arguments, and CLI error paths. The optional Python
+standard-library suite runs over 3,000 additional CLI cases, comparing conversions
+against `ast.literal_eval` and
 `json.dumps`, and checking JSON token preservation and clean rejection of
 adversarial inputs. Python is needed only for that extra test suite. Both
 generators use fixed inputs/seeds so failures are reproducible.

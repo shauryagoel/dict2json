@@ -10,11 +10,16 @@ const MAX_DEPTH: usize = 64;
 
 /// Convert Python dictionaries or valid JSON with one space after object commas.
 pub fn convert(input: &str) -> Result<String, String> {
+    Ok(space_object_entries(&convert_exact(input)?))
+}
+
+/// Preserve valid JSON byte for byte, or convert Python dictionaries to compact JSON.
+pub fn convert_exact(input: &str) -> Result<String, String> {
     if input.len() > MAX_INPUT_BYTES {
         return Err("input exceeds the 16 MiB limit".into());
     }
     if serde_json::from_str::<&RawValue>(input).is_ok() {
-        return Ok(space_object_entries(input));
+        return Ok(input.to_owned());
     }
     let literal = input.trim_matches([' ', '\t', '\r', '\n']);
     if literal.contains('\0') || literal.starts_with('\u{feff}') {
@@ -25,8 +30,7 @@ pub fn convert(input: &str) -> Result<String, String> {
     if !matches!(expression, Expr::Dict(_)) {
         return Err("Python input must be a dictionary with string keys".into());
     }
-    let json = serde_json::to_string(&to_json(expression)?).map_err(|error| error.to_string())?;
-    Ok(space_object_entries(&json))
+    serde_json::to_string(&to_json(expression)?).map_err(|error| error.to_string())
 }
 
 fn space_object_entries(json: &str) -> String {

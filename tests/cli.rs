@@ -1,5 +1,7 @@
 use std::{
+    fs,
     io::Write,
+    path::PathBuf,
     process::{Command, Output, Stdio},
 };
 
@@ -13,6 +15,122 @@ fn run(arguments: &[&str], input: &[u8]) -> Output {
         .unwrap();
     child.stdin.take().unwrap().write_all(input).unwrap();
     child.wait_with_output().unwrap()
+}
+
+struct InputFile(PathBuf);
+
+impl InputFile {
+    fn new(name: &str, contents: &[u8]) -> Self {
+        let path = std::env::temp_dir().join(format!("dict2json-{}-{name}", std::process::id()));
+        fs::write(&path, contents).unwrap();
+        Self(path)
+    }
+
+    fn path(&self) -> &str {
+        self.0.to_str().unwrap()
+    }
+}
+
+impl Drop for InputFile {
+    fn drop(&mut self) {
+        fs::remove_file(&self.0).unwrap();
+    }
+}
+
+#[test]
+fn reads_a_file_without_changing_it() {
+    let source = b"{'a': True, 'b': None}";
+    let file = InputFile::new("input with spaces.txt", source);
+    let output = run(&["--file", file.path()], b"ignored stdin");
+    assert!(output.status.success(), "{:?}", output.stderr);
+    assert_eq!(output.stdout, br#"{"a":true, "b":null}"#);
+    assert!(output.stderr.is_empty());
+    assert_eq!(fs::read(&file.0).unwrap(), source);
+}
+
+#[test]
+fn exact_preserves_json_bytes_from_every_input_path() {
+    let source = " \r\n{\"b\":1e400,\"a\":-0,\"b\":2,\"u\":\"\\ud800\"}\t ";
+    let file = InputFile::new("exact.json", source.as_bytes());
+    for output in [
+        run(&["--exact", source], b""),
+        run(&[source, "--exact"], b""),
+        run(&["--exact"], source.as_bytes()),
+        run(&["--exact", "-"], source.as_bytes()),
+        run(&["--exact", "--", source], b""),
+        run(&["--exact", "--file", file.path()], b""),
+        run(&["--file", file.path(), "--exact"], b""),
+    ] {
+        assert!(output.status.success(), "{:?}", output.stderr);
+        assert_eq!(output.stdout, source.as_bytes());
+        assert!(output.stderr.is_empty());
+    }
+}
+
+#[test]
+fn exact_still_converts_python_literals() {
+    let output = run(&["--exact", "{'a': True, 'b': None}"], b"");
+    assert!(output.status.success(), "{:?}", output.stderr);
+    assert_eq!(output.stdout, br#"{"a":true,"b":null}"#);
+    assert!(output.stderr.is_empty());
+}
+
+#[test]
+fn accepts_negative_json_numbers_as_arguments() {
+    for input in ["-0", "-1", "-1.00", "-2.3E-10", "-1e400"] {
+        for arguments in [vec![input], vec!["--exact", input]] {
+            let output = run(&arguments, b"");
+            assert!(
+                output.status.success(),
+                "{arguments:?}: {:?}",
+                output.stderr
+            );
+            assert_eq!(output.stdout, input.as_bytes());
+            assert!(output.stderr.is_empty());
+        }
+    }
+}
+
+#[test]
+fn spaces_valid_json_from_a_file() {
+    let source = b" \n{\"b\":1e400,\"a\":-0,\"b\":2}\t ";
+    let file = InputFile::new("spacing.json", source);
+    let output = run(&["--file", file.path()], b"");
+    assert!(output.status.success(), "{:?}", output.stderr);
+    assert_eq!(output.stdout, b" \n{\"b\":1e400, \"a\":-0, \"b\":2}\t ");
+    assert!(output.stderr.is_empty());
+}
+
+#[test]
+fn rejects_invalid_file_input_and_option_combinations() {
+    let invalid = InputFile::new("invalid.txt", b"{'x':}");
+    let non_utf8 = InputFile::new("non-utf8.txt", &[0xff, 0xfe]);
+    let mut oversized_source = vec![b' '; dict2json::MAX_INPUT_BYTES + 1];
+    oversized_source[..2].copy_from_slice(b"{}");
+    let oversized = InputFile::new("oversized.txt", &oversized_source);
+    let missing =
+        std::env::temp_dir().join(format!("dict2json-{}-missing.txt", std::process::id()));
+    assert!(!missing.exists());
+    for arguments in [
+        vec!["--file"],
+        vec!["--file", missing.to_str().unwrap()],
+        vec!["--file", invalid.path()],
+        vec!["--exact", "--file", invalid.path()],
+        vec!["--file", non_utf8.path()],
+        vec!["--file", oversized.path()],
+        vec!["--file", invalid.path(), "{}"],
+        vec!["{}", "--file", invalid.path()],
+        vec!["--file", invalid.path(), "-"],
+        vec!["--file", invalid.path(), "--file", invalid.path()],
+        vec!["--unknown"],
+        vec!["--"],
+        vec!["--exact", "{'x':}"],
+    ] {
+        let output = run(&arguments, b"");
+        assert_eq!(output.status.code(), Some(1), "{arguments:?}");
+        assert!(output.stdout.is_empty(), "{arguments:?}");
+        assert!(String::from_utf8_lossy(&output.stderr).starts_with("dict2json: "));
+    }
 }
 
 #[test]
@@ -62,6 +180,11 @@ fn prints_help_and_version() {
         let output = run(&[argument], b"");
         assert!(output.status.success());
         assert!(String::from_utf8_lossy(&output.stdout).contains("dict2json"));
+        if argument == "-h" || argument == "--help" {
+            let help = String::from_utf8_lossy(&output.stdout);
+            assert!(help.contains("--file PATH"));
+            assert!(help.contains("--exact"));
+        }
         assert!(output.stderr.is_empty());
     }
 }
