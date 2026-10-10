@@ -38,6 +38,38 @@ impl Drop for InputFile {
 }
 
 #[test]
+fn input_diagnostics_work_for_arguments_stdin_files_and_exact_mode() {
+    let source = "\n  {'é': }\n";
+    let file = InputFile::new("diagnostic with spaces.txt", source.as_bytes());
+    for exact in [false, true] {
+        let flag = if exact { vec!["--exact"] } else { vec![] };
+        for (arguments, stdin, file_input) in [
+            ([flag.clone(), vec![source]].concat(), b"".as_slice(), false),
+            (flag.clone(), source.as_bytes(), false),
+            ([flag.clone(), vec!["-"]].concat(), source.as_bytes(), false),
+            (
+                [flag, vec!["--file", file.path()]].concat(),
+                b"".as_slice(),
+                true,
+            ),
+        ] {
+            let output = run(&arguments, stdin);
+            assert_eq!(output.status.code(), Some(1));
+            assert!(output.stdout.is_empty());
+            let error = String::from_utf8(output.stderr).unwrap();
+            assert!(error.starts_with("dict2json: "), "{error}");
+            assert!(error.contains("line 2, column 9"), "{error}");
+            assert!(error.contains("2 |   {'é': }\n  |         ^"), "{error}");
+            assert!(error.contains("hint: add a value after ':'"), "{error}");
+            if file_input {
+                assert!(error.contains(file.path()), "{error}");
+            }
+        }
+    }
+    assert_eq!(fs::read(&file.0).unwrap(), source.as_bytes());
+}
+
+#[test]
 fn reads_a_file_without_changing_it() {
     let source = b"{'a': True, 'b': None}";
     let file = InputFile::new("input with spaces.txt", source);

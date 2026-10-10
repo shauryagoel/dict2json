@@ -98,7 +98,29 @@ delimiter nesting is limited to 64, including the outer dictionary. Valid JSON
 does not have this Python nesting limit.
 
 Invalid or unsupported input exits with status `1`, writes a diagnostic to
-stderr, and leaves stdout empty. Input is parsed using
+stderr, and leaves stdout empty. Syntax and literal validation errors show a
+one-based line and column in the original input, a source excerpt with a caret,
+and a hint about the likely correction. For example, `dict2json "{'x':}"` reports:
+
+```text
+dict2json: missing dictionary value at line 1, column 6
+1 | {'x':}
+  |      ^
+hint: add a value after ':' before closing the dictionary
+```
+
+File conversion errors also include the source filename. Diagnostics work with
+arguments, stdin, files, and `--exact`. Columns count Unicode characters;
+leading whitespace and LF, CRLF, or CR line endings keep their original positions.
+Excerpts are limited to 100 source characters around the error, with `...` marking
+cropped text. Tabs and control characters are escaped for safe terminal display.
+Carets use character spacing, so wide Unicode glyphs can affect visual alignment.
+The location marks where the problem was detected; an unclosed string or
+delimiter can point to the end of the input. Hints describe probable causes, and
+one error is reported at a time. Input size and read failures report the relevant
+limit or I/O error.
+
+Input is parsed using
 [RustPython](https://docs.rs/rustpython-parser/0.4.0/rustpython_parser/), never
 executed. JSON validation and encoding use
 [serde_json](https://docs.rs/serde_json/latest/serde_json/).
@@ -114,8 +136,9 @@ python3 tests/differential.py target/release/dict2json
 ```
 
 Rust tests cover conversion, 2,000 generated dictionaries, input limits,
-malformed source, files/stdin/arguments, object spacing, exact JSON preservation,
-negative numeric arguments, and CLI error paths. The optional Python
+malformed source, diagnostic locations and hints, bounded terminal-safe excerpts,
+files/stdin/arguments, object spacing, exact JSON preservation, negative numeric
+arguments, and CLI error paths. The optional Python
 standard-library suite runs over 3,000 additional CLI cases, comparing conversions
 against `ast.literal_eval` and
 `json.dumps`, and checking JSON token preservation and clean rejection of

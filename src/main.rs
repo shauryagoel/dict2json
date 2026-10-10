@@ -67,12 +67,12 @@ fn run() -> Result<(), String> {
             }
         }
     }
-    let input = match (input, file) {
+    let input = match (input, file.as_deref()) {
         (Some(_), Some(_)) => {
             return Err("choose an input argument or --file, not both; see --help".into());
         }
         (None, Some(path)) => {
-            let file = File::open(&path)
+            let file = File::open(path)
                 .map_err(|error| format!("could not open input file {path:?}: {error}"))?;
             read_input(file).map_err(|error| format!("{path:?}: {error}"))?
         }
@@ -80,10 +80,14 @@ fn run() -> Result<(), String> {
         _ => read_stdin()?,
     };
     let output = if exact {
-        convert_exact(&input)?
+        convert_exact(&input)
     } else {
-        convert(&input)?
-    };
+        convert(&input)
+    }
+    .map_err(|error| match file {
+        Some(path) => format!("{path:?}: {error}"),
+        None => error,
+    })?;
     io::stdout()
         .lock()
         .write_all(output.as_bytes())

@@ -2,6 +2,145 @@ use dict2json::{convert, convert_exact};
 use serde_json::{Value, json};
 
 #[test]
+fn syntax_diagnostics_point_into_the_original_input() {
+    for input in ["\n  {'é': }\n", "\r\n  {'é': }\r\n", "\r  {'é': }\r"] {
+        for convert in [convert, convert_exact] {
+            let error = convert(input).unwrap_err();
+            assert!(
+                error.contains("missing dictionary value at line 2, column 9"),
+                "{error}"
+            );
+            assert!(error.contains("2 |   {'é': }\n  |         ^"), "{error}");
+            assert!(error.contains("hint: add a value after ':'"), "{error}");
+        }
+    }
+}
+
+#[test]
+fn semantic_diagnostics_locate_the_offending_key_or_value() {
+    for (input, location, message, hint) in [
+        (
+            "{'outer': {2: 'bad'}}",
+            "line 1, column 12",
+            "dictionary keys must be strings",
+            "quote",
+        ),
+        (
+            "\n\n{'x': 1e400}",
+            "line 3, column 7",
+            "non-finite numbers",
+            "finite",
+        ),
+        (
+            "{'x': print('bad')}",
+            "line 1, column 7",
+            "unsupported Python expression",
+            "function calls",
+        ),
+        (
+            "{'x': {'bad'}}",
+            "line 1, column 7",
+            "JSON-compatible Python literals",
+            "sets",
+        ),
+        (
+            "{'x': '\\ud800'}",
+            "line 1, column 7",
+            "Unicode surrogates",
+            "Unicode",
+        ),
+    ] {
+        for convert in [convert, convert_exact] {
+            let error = convert(input).unwrap_err();
+            for expected in [location, message, "^", "hint:", hint] {
+                assert!(
+                    error.contains(expected),
+                    "{input:?}: expected {expected:?} in {error}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn syntax_diagnostics_suggest_likely_corrections() {
+    for (input, hint) in [
+        ("{'x' 1}", "':'"),
+        ("{'x': 1 'y': 2}", "','"),
+        ("{'x': [1, 2}", "delimiter"),
+        ("{'x': [1, 2", "close"),
+        ("{'x': 'unfinished}", "quote"),
+        ("{'x': '''unfinished}", "quote"),
+        ("{'x': b'bytes'}", "string"),
+        ("{'x': --1}", "numeric literal"),
+        ("", "provide"),
+    ] {
+        let error = convert(input).unwrap_err();
+        assert!(error.contains("line "), "{input:?}: {error}");
+        assert!(error.contains("column "), "{input:?}: {error}");
+        assert!(error.contains("hint:"), "{input:?}: {error}");
+        assert!(
+            error.contains(hint),
+            "{input:?}: expected {hint:?} in {error}"
+        );
+    }
+}
+
+#[test]
+fn malformed_json_reports_its_syntax_error_after_json_literals() {
+    for (input, location, cause, hint) in [
+        (
+            "{\"é\": true, \"x\":}",
+            "line 1, column 17",
+            "expected value",
+            "add a value",
+        ),
+        (
+            "{\r\n  \"é\": true,\r\n  \"x\":\r\n}\r\n",
+            "line 4, column 1",
+            "expected value",
+            "add a value",
+        ),
+        (
+            "{\"x\": null, \"y\": [1,]}",
+            "line 1, column 21",
+            "expected value",
+            "remove the trailing comma",
+        ),
+        ("{\"x\": true", "line 1, column 11", "EOF", "close"),
+    ] {
+        for convert in [convert, convert_exact] {
+            let error = convert(input).unwrap_err();
+            for expected in [location, cause, hint] {
+                assert!(
+                    error.contains(expected),
+                    "{input:?}: expected {expected:?} in {error}"
+                );
+            }
+        }
+    }
+    let error = convert("{'x': null}").unwrap_err();
+    assert!(error.contains("line 1, column 7"), "{error}");
+    assert!(error.contains("None"), "{error}");
+}
+
+#[test]
+fn diagnostic_excerpts_are_bounded_and_escape_terminal_controls() {
+    let input = format!("{{'x': '{}\u{1b}[31m', 'y': missing}}", "é".repeat(100_000));
+    let error = convert(&input).unwrap_err();
+    assert!(error.len() < 2_000, "diagnostic is {} bytes", error.len());
+    assert!(error.contains("..."), "{error}");
+    assert!(!error.contains('\u{1b}'), "{error:?}");
+    assert!(error.contains("\\u{1b}"), "{error}");
+    let error = convert("\t{'x': missing}").unwrap_err();
+    assert!(error.contains("line 1, column 8"), "{error}");
+    assert!(
+        error.contains("1 | \\t{'x': missing}\n  |         ^"),
+        "{error}"
+    );
+}
+
+#[test]
 fn exact_preserves_valid_json_and_only_converts_python() {
     for input in [
         " \r\n{\"a\":1e400,\"a\":-0,\"u\":\"\\ud800\",\"n\":1.00}\t ",

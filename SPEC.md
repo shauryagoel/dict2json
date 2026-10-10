@@ -25,6 +25,14 @@ literal into one JSON string. Python is not required at runtime.
 - Limit input to 16 MiB and Python delimiter nesting to 64 for predictable
   resource use. Invalid input produces a nonzero exit status, an explanatory
   message on stderr, and no stdout. Write no extra newline.
+- For syntax and literal validation errors, show a one-based line and Unicode
+  character column in the original input, a source excerpt with a caret, and a
+  hint about the probable cause or correction. Preserve locations through leading
+  whitespace and LF, CRLF, or CR line endings. Bound excerpts to 100 source
+  characters, escape terminal controls, and name the file for `--file` conversion
+  errors. Diagnose malformed JSON beyond its lowercase literals using the JSON
+  parser's failure location. Keep both conversion functions' public
+  `Result<String, String>` interfaces and all successful conversion behavior.
 - Provide `--help` and `--version`, using Rust's standard argument/I/O APIs.
   Preserve `-` for stdin and `-- INPUT` for stopping option parsing, and accept
   negative JSON numbers as positional input. Never modify the source file.
@@ -56,7 +64,8 @@ Every successful conversion must decode as JSON and retain the expected data;
 JSON input must remain unchanged except for default object separator spacing,
 and must be identical with `--exact`. Test the supplied timestamp example,
 Unicode and escape forms, numeric boundaries,
-nesting, malformed/unsupported inputs, files/stdin/arguments, option combinations,
+nesting, malformed/unsupported inputs, diagnostic locations and hints, Unicode
+columns and escaped/cropped excerpts, files/stdin/arguments, option combinations,
 negative JSON arguments, file read errors and limits, exit codes, and
 deterministic generated cases.
 Do not change existing agent configuration, publish, or merge as part of this
