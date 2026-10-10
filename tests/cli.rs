@@ -43,7 +43,7 @@ fn reads_a_file_without_changing_it() {
     let file = InputFile::new("input with spaces.txt", source);
     let output = run(&["--file", file.path()], b"ignored stdin");
     assert!(output.status.success(), "{:?}", output.stderr);
-    assert_eq!(output.stdout, br#"{"a":true, "b":null}"#);
+    assert_eq!(output.stdout, br#"{"a": true, "b": null}"#);
     assert!(output.stderr.is_empty());
     assert_eq!(fs::read(&file.0).unwrap(), source);
 }
@@ -97,7 +97,7 @@ fn spaces_valid_json_from_a_file() {
     let file = InputFile::new("spacing.json", source);
     let output = run(&["--file", file.path()], b"");
     assert!(output.status.success(), "{:?}", output.stderr);
-    assert_eq!(output.stdout, b" \n{\"b\":1e400, \"a\":-0, \"b\":2}\t ");
+    assert_eq!(output.stdout, b" \n{\"b\": 1e400, \"a\": -0, \"b\": 2}\t ");
     assert!(output.stderr.is_empty());
 }
 
@@ -143,7 +143,7 @@ fn accepts_an_argument_stdin_and_explicit_stdin() {
     ] {
         let output = run(&arguments, input);
         assert!(output.status.success(), "{:?}", output.stderr);
-        assert_eq!(output.stdout, br#"{"a":true, "b":null}"#);
+        assert_eq!(output.stdout, br#"{"a": true, "b": null}"#);
         assert!(output.stderr.is_empty());
     }
 }
@@ -151,7 +151,7 @@ fn accepts_an_argument_stdin_and_explicit_stdin() {
 #[test]
 fn spaces_valid_json_through_both_input_paths() {
     let json = " \n{\"b\":1e400,\"a\":-0,\"b\":2}\t ";
-    let expected = b" \n{\"b\":1e400, \"a\":-0, \"b\":2}\t ";
+    let expected = b" \n{\"b\": 1e400, \"a\": -0, \"b\": 2}\t ";
     for output in [run(&[json], b""), run(&[], json.as_bytes())] {
         assert!(output.status.success());
         assert_eq!(output.stdout, expected);

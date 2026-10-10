@@ -1,7 +1,7 @@
 # dict2json
 
 A Rust CLI that safely converts Python dictionary literals into JSON, with one
-space after commas between object key–value pairs by default and no added trailing
+space after object commas and key colons by default and no added trailing
 space. Already-valid JSON uses the same spacing. All other input bytes are preserved,
 including string contents, array separators, key order, duplicate keys, and
 number formatting. Use `--exact` to preserve already-valid JSON byte for byte.
@@ -32,7 +32,7 @@ dict2json "{'project_name': 'xyz', 'start_time': '2026-10-07 13:00:00+05:30', 'e
 Output:
 
 ```json
-{"project_name":"xyz", "start_time":"2026-10-07 13:00:00+05:30", "end_time":"2026-10-07 19:00:00+05:30"}
+{"project_name": "xyz", "start_time": "2026-10-07 13:00:00+05:30", "end_time": "2026-10-07 19:00:00+05:30"}
 ```
 
 Stdin is useful for files, multiline input, or strings with shell characters:
@@ -69,9 +69,9 @@ No argument, or `-`, reads the entire stdin stream as one value. Use `--` before
 an input argument to stop option parsing. `--help` and `--version` print usage and
 version information. Output has no added newline.
 Object separator spacing also applies to nested objects; array separators and
-commas inside strings keep their existing formatting. For valid JSON, whitespace
-immediately after an object separator comma is replaced by one space unless
-`--exact` is used.
+commas or colons inside strings keep their existing formatting. For valid JSON,
+whitespace immediately after an object separator comma or key colon is replaced
+by one space unless `--exact` is used.
 
 ## Supported input
 

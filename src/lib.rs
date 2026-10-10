@@ -8,7 +8,7 @@ use serde_json::{Map, Number, Value, value::RawValue};
 pub const MAX_INPUT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_DEPTH: usize = 64;
 
-/// Convert Python dictionaries or valid JSON with one space after object commas.
+/// Convert Python dictionaries or valid JSON with one space after object commas and key colons.
 pub fn convert(input: &str) -> Result<String, String> {
     Ok(space_object_entries(&convert_exact(input)?))
 }
@@ -55,7 +55,7 @@ fn space_object_entries(json: &str) -> String {
             '}' | ']' => {
                 containers.pop();
             }
-            ',' if containers.last() == Some(&'{') => {
+            ',' | ':' if containers.last() == Some(&'{') => {
                 output.push(' ');
                 while chars.next_if(|c| c.is_ascii_whitespace()).is_some() {}
             }

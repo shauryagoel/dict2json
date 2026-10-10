@@ -27,7 +27,7 @@ fn exact_preserves_valid_json_and_only_converts_python() {
 fn converts_the_supplied_example_in_order() {
     let input = "{'project_name': 'xyz', 'start_time': '2026-10-07 13:00:00+05:30', 'end_time': '2026-10-07 19:00:00+05:30'}";
     let output = convert(input).unwrap();
-    let expected = r#"{"project_name":"xyz", "start_time":"2026-10-07 13:00:00+05:30", "end_time":"2026-10-07 19:00:00+05:30"}"#;
+    let expected = r#"{"project_name": "xyz", "start_time": "2026-10-07 13:00:00+05:30", "end_time": "2026-10-07 19:00:00+05:30"}"#;
     assert_eq!(output, expected);
     assert_eq!(
         convert(r#"{"project_name":"xyz","start_time":"2026-10-07 13:00:00+05:30","end_time":"2026-10-07 19:00:00+05:30"}"#).unwrap(),
@@ -46,7 +46,7 @@ fn preserves_valid_json_with_no_object_spacing_changes_needed() {
         "true",
         "null",
         "\"hello\"",
-        "{\"x\":\"\\ud800\"}",
+        "{\"x\": \"\\ud800\"}",
     ] {
         assert_eq!(convert(input).unwrap(), input);
     }
@@ -57,17 +57,21 @@ fn normalizes_valid_json_object_separator_spacing() {
     for (input, expected) in [
         (
             "\n{ \"a\" :1,\t \r\n  \"b\":2}\n",
-            "\n{ \"a\" :1, \"b\":2}\n",
+            "\n{ \"a\" : 1, \"b\": 2}\n",
+        ),
+        (
+            "{\"a\":\t \r\n [1,2],\"b\":\n\t{\"c\" : \t true}}",
+            "{\"a\": [1,2], \"b\": {\"c\" : true}}",
         ),
         (
             r#"[{"a":1,"b":2},{"c":3,"d":4},1,2]"#,
-            r#"[{"a":1, "b":2},{"c":3, "d":4},1,2]"#,
+            r#"[{"a": 1, "b": 2},{"c": 3, "d": 4},1,2]"#,
         ),
         (
             r#"{"a":1e400,"a":-0,"u":"\ud800","n":1.00}"#,
-            r#"{"a":1e400, "a":-0, "u":"\ud800", "n":1.00}"#,
+            r#"{"a": 1e400, "a": -0, "u": "\ud800", "n": 1.00}"#,
         ),
-        (r#"{"only":1}"#, r#"{"only":1}"#),
+        (r#"{"only":1}"#, r#"{"only": 1}"#),
         ("{}", "{}"),
     ] {
         let output = convert(input).unwrap();
@@ -78,10 +82,10 @@ fn normalizes_valid_json_object_separator_spacing() {
 
 #[test]
 fn spaces_nested_objects_without_changing_arrays_or_string_contents() {
-    let expected = r#"{"a,b":"a,b {\"x\":1,\"y\":2}", "slash\\":"ends with \\", "items":[1,{"a":2, "b":3},[4,5]]}"#;
+    let expected = r#"{"a,b:c": "a,b {\"x\":1,\"y\":2}", "slash\\": "ends with \\", "items": [1,{"a": 2, "b": 3},[4,5]]}"#;
     for input in [
-        r#"{'a,b': 'a,b {"x":1,"y":2}', 'slash\\': 'ends with \\', 'items': [1, {'a': 2, 'b': 3}, (4, 5)]}"#,
-        r#"{"a,b":"a,b {\"x\":1,\"y\":2}","slash\\":"ends with \\","items":[1,{"a":2,"b":3},[4,5]]}"#,
+        r#"{'a,b:c': 'a,b {"x":1,"y":2}', 'slash\\': 'ends with \\', 'items': [1, {'a': 2, 'b': 3}, (4, 5)]}"#,
+        r#"{"a,b:c":"a,b {\"x\":1,\"y\":2}","slash\\":"ends with \\","items":[1,{"a":2,"b":3},[4,5]]}"#,
     ] {
         assert_eq!(convert(input).unwrap(), expected, "{input:?}");
     }
@@ -147,7 +151,7 @@ fn preserves_numeric_values_without_truncating_integers() {
         ("{'n': -(0xFF)}", "-255"),
     ];
     for (input, expected) in cases {
-        assert_eq!(convert(input).unwrap(), format!("{{\"n\":{expected}}}"));
+        assert_eq!(convert(input).unwrap(), format!("{{\"n\": {expected}}}"));
     }
 }
 
@@ -155,7 +159,7 @@ fn preserves_numeric_values_without_truncating_integers() {
 fn duplicate_keys_keep_the_last_value_and_original_position() {
     assert_eq!(
         convert("{'x': 1, 'y': 2, 'x': 3}").unwrap(),
-        r#"{"x":3, "y":2}"#
+        r#"{"x": 3, "y": 2}"#
     );
 }
 
@@ -196,7 +200,7 @@ fn guards_resource_limits_and_long_expressions() {
     assert_eq!(convert(&deep_json).unwrap(), deep_json);
     assert_eq!(convert_exact(&deep_json).unwrap(), deep_json);
     let deep_json = "[".repeat(10_000) + r#"{"x":1,"y":2}"# + &"]".repeat(10_000);
-    let expected = "[".repeat(10_000) + r#"{"x":1, "y":2}"# + &"]".repeat(10_000);
+    let expected = "[".repeat(10_000) + r#"{"x": 1, "y": 2}"# + &"]".repeat(10_000);
     assert_eq!(convert(&deep_json).unwrap(), expected);
     assert_eq!(convert_exact(&deep_json).unwrap(), deep_json);
 }

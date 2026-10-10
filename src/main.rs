@@ -6,7 +6,7 @@ use std::{
     process::ExitCode,
 };
 
-const HELP: &str = "Usage: dict2json [--exact] [INPUT]\n       dict2json [--exact] --file PATH\n       dict2json [--exact] < input.txt\n\nConvert a Python dictionary literal or valid JSON to JSON.\nBy default, use one space after commas between object key/value pairs.\nPass INPUT as one quoted argument, or read stdin with no argument or '-'.\nUse -- before INPUT to stop option parsing. Choose only one input source.\nDictionary keys must be strings. Input limit: 16 MiB; Python nesting: 64.\n\nOptions:\n  --file PATH   Read UTF-8 input from a file\n  --exact       Preserve valid JSON unchanged; convert Python to compact JSON\n  -h, --help     Print help\n  -V, --version  Print version\n";
+const HELP: &str = "Usage: dict2json [--exact] [INPUT]\n       dict2json [--exact] --file PATH\n       dict2json [--exact] < input.txt\n\nConvert a Python dictionary literal or valid JSON to JSON.\nBy default, use one space after object commas and key colons.\nPass INPUT as one quoted argument, or read stdin with no argument or '-'.\nUse -- before INPUT to stop option parsing. Choose only one input source.\nDictionary keys must be strings. Input limit: 16 MiB; Python nesting: 64.\n\nOptions:\n  --file PATH   Read UTF-8 input from a file\n  --exact       Preserve valid JSON unchanged; convert Python to compact JSON\n  -h, --help     Print help\n  -V, --version  Print version\n";
 
 fn run() -> Result<(), String> {
     let arguments: Vec<String> = env::args_os()

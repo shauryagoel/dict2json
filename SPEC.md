@@ -6,7 +6,7 @@ literal into one JSON string. Python is not required at runtime.
 - Accept exactly one input argument, read a UTF-8 file with `--file PATH`, or read
   the entire UTF-8 stdin stream. Reject multiple explicit input sources or repeated
   file options. With an argument or file, ignore stdin.
-- Use one space after commas between object key–value pairs, including nested
+- Use one space after object separator commas and key colons, including nested
   objects, with no added trailing space, by default. Apply this to Python
   conversions and valid JSON. For valid JSON, preserve every other byte, including
   string contents, array separators, numbers, duplicate keys, and key order. Any
