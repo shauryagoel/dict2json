@@ -8,13 +8,13 @@ use serde_json::{Map, Number, Value, value::RawValue};
 pub const MAX_INPUT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_DEPTH: usize = 64;
 
-/// Preserve JSON exactly, or safely convert a Python dictionary literal.
+/// Convert Python dictionaries or valid JSON with one space after object commas.
 pub fn convert(input: &str) -> Result<String, String> {
     if input.len() > MAX_INPUT_BYTES {
         return Err("input exceeds the 16 MiB limit".into());
     }
     if serde_json::from_str::<&RawValue>(input).is_ok() {
-        return Ok(input.to_owned());
+        return Ok(space_object_entries(input));
     }
     let literal = input.trim_matches([' ', '\t', '\r', '\n']);
     if literal.contains('\0') || literal.starts_with('\u{feff}') {
@@ -25,7 +25,40 @@ pub fn convert(input: &str) -> Result<String, String> {
     if !matches!(expression, Expr::Dict(_)) {
         return Err("Python input must be a dictionary with string keys".into());
     }
-    serde_json::to_string(&to_json(expression)?).map_err(|error| error.to_string())
+    let json = serde_json::to_string(&to_json(expression)?).map_err(|error| error.to_string())?;
+    Ok(space_object_entries(&json))
+}
+
+fn space_object_entries(json: &str) -> String {
+    // JSON is already validated; adjust separators without re-encoding its data.
+    let mut output = String::with_capacity(json.len());
+    let mut containers = Vec::new();
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut chars = json.chars().peekable();
+    while let Some(character) = chars.next() {
+        output.push(character);
+        if in_string {
+            if character == '"' && !escaped {
+                in_string = false;
+            }
+            escaped = character == '\\' && !escaped;
+            continue;
+        }
+        match character {
+            '"' => in_string = true,
+            '{' | '[' => containers.push(character),
+            '}' | ']' => {
+                containers.pop();
+            }
+            ',' if containers.last() == Some(&'{') => {
+                output.push(' ');
+                while chars.next_if(|c| c.is_ascii_whitespace()).is_some() {}
+            }
+            _ => {}
+        }
+    }
+    output
 }
 
 fn check_tokens(input: &str) -> Result<(), String> {

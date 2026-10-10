@@ -5,7 +5,7 @@ use std::{
     process::ExitCode,
 };
 
-const HELP: &str = "Usage: dict2json [INPUT]\n       dict2json < input.txt\n\nConvert a Python dictionary literal to JSON. Valid JSON is preserved exactly.\nPass INPUT as one quoted argument, or read stdin with no argument or '-'.\nDictionary keys must be strings. Input limit: 16 MiB; Python nesting: 64.\n\nOptions:\n  -h, --help     Print help\n  -V, --version  Print version\n";
+const HELP: &str = "Usage: dict2json [INPUT]\n       dict2json < input.txt\n\nConvert a Python dictionary literal or valid JSON to JSON.\nUse one space after commas between object key/value pairs.\nPass INPUT as one quoted argument, or read stdin with no argument or '-'.\nDictionary keys must be strings. Input limit: 16 MiB; Python nesting: 64.\n\nOptions:\n  -h, --help     Print help\n  -V, --version  Print version\n";
 
 fn run() -> Result<(), String> {
     let arguments: Vec<String> = env::args_os()

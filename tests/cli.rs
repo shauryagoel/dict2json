@@ -18,24 +18,25 @@ fn run(arguments: &[&str], input: &[u8]) -> Output {
 #[test]
 fn accepts_an_argument_stdin_and_explicit_stdin() {
     for (arguments, input) in [
-        (vec!["{'a': True}"], b"".as_slice()),
-        (vec![], b"{'a': True}".as_slice()),
-        (vec!["-"], b"{'a': True}".as_slice()),
-        (vec!["--", "{'a': True}"], b"".as_slice()),
+        (vec!["{'a': True, 'b': None}"], b"".as_slice()),
+        (vec![], b"{'a': True, 'b': None}".as_slice()),
+        (vec!["-"], b"{'a': True, 'b': None}".as_slice()),
+        (vec!["--", "{'a': True, 'b': None}"], b"".as_slice()),
     ] {
         let output = run(&arguments, input);
         assert!(output.status.success(), "{:?}", output.stderr);
-        assert_eq!(output.stdout, br#"{"a":true}"#);
+        assert_eq!(output.stdout, br#"{"a":true, "b":null}"#);
         assert!(output.stderr.is_empty());
     }
 }
 
 #[test]
-fn preserves_json_bytes_through_both_input_paths() {
+fn spaces_valid_json_through_both_input_paths() {
     let json = " \n{\"b\":1e400,\"a\":-0,\"b\":2}\t ";
+    let expected = b" \n{\"b\":1e400, \"a\":-0, \"b\":2}\t ";
     for output in [run(&[json], b""), run(&[], json.as_bytes())] {
         assert!(output.status.success());
-        assert_eq!(output.stdout, json.as_bytes());
+        assert_eq!(output.stdout, expected);
         assert!(output.stderr.is_empty());
     }
 }

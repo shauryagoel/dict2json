@@ -6,16 +6,19 @@ import json
 import math
 from pathlib import Path
 import random
+import re
 import subprocess
 import sys
 
 
 SEED = 20261007
 MAX_INPUT = 16 * 1024 * 1024
+JSON_TOKENS = re.compile(r'"(?:[^"\\]|\\.)*"|[^ \t\r\n"]')
 STRINGS = [
     "", "plain", "single ' quote", 'double " quote', "back\\slash", "\n\r\t\b\f\0",
     "हिन्दी", "中文", "😀🚀", "é", "e\u0301", "\u2028\u2029", "True None False",
-    "{[(:)]}", "a/b", "line\nline", "# comment", "\\u1234", "\x01\x1f\x7f",
+    "{[(:)]}", "a,b", ', {"a":1,"b":2}', "ends with \\", "a/b", "line\nline",
+    "# comment", "\\u1234", "\x01\x1f\x7f",
 ]
 FLOATS = [0.0, -0.0, 0.1, -0.1, 1.2345678901234567, 5e-324, -5e-324,
           2.2250738585072014e-308, 1.7976931348623157e308, -1.7976931348623157e308]
@@ -50,17 +53,19 @@ def run(binary, source):
     return result
 
 
-def accepted(binary, source, *, passthrough=False):
+def accepted(binary, source, *, json_input=False):
     result = run(binary, source)
     preview = repr(source[:160])
     assert result.returncode == 0, f"rejected {preview}: {result.stderr[:500]!r}"
     assert not result.stderr, f"successful input wrote stderr for {preview}: {result.stderr!r}"
     try:
-        actual = load_json(result.stdout.decode("utf-8"))
+        output = result.stdout.decode("utf-8")
+        actual = load_json(output)
     except (UnicodeError, ValueError) as error:
         raise AssertionError(f"invalid JSON output for {preview}: {result.stdout[:500]!r}") from error
-    if passthrough:
-        assert result.stdout == source.encode("utf-8"), f"changed valid JSON {preview}"
+    if json_input:
+        assert JSON_TOKENS.findall(output) == JSON_TOKENS.findall(source), \
+            f"changed valid JSON tokens {preview}"
     else:
         assert canonical(actual) == canonical(expected_literal(source)), \
             f"wrong conversion for {preview}: {actual!r}"
@@ -98,7 +103,7 @@ def main():
     if not binary.is_file():
         sys.exit(f"Binary not found: {binary}; build with cargo build first.")
     rng = random.Random(SEED)
-    counts = {"literal fixtures": 0, "generated dictionaries": 0, "JSON passthrough": 0,
+    counts = {"literal fixtures": 0, "generated dictionaries": 0, "JSON formatting": 0,
               "rejections": 0, "adversarial inputs": 0}
 
     literals = [
@@ -155,8 +160,8 @@ def main():
         json_inputs.append(json.dumps(value, ensure_ascii=rng.choice([True, False]),
                                      indent=rng.choice([None, 2]), allow_nan=False))
     for source in json_inputs:
-        accepted(binary, source, passthrough=True)
-        counts["JSON passthrough"] += 1
+        accepted(binary, source, json_input=True)
+        counts["JSON formatting"] += 1
 
     unsupported = [
         "", "   ", "{'x':}", "{'x': 1", "{'x': 1} trailing", "{'x' 'y':}",
@@ -205,14 +210,16 @@ def main():
         result = run(binary, source)
         if result.returncode == 0:
             assert not result.stderr, f"successful fuzz input wrote stderr: {source!r}"
-            actual = load_json(result.stdout.decode("utf-8"))
+            output = result.stdout.decode("utf-8")
+            actual = load_json(output)
             try:
                 load_json(source)
             except ValueError:
                 assert canonical(actual) == canonical(expected_literal(source)), \
                     f"wrong fuzz conversion: {source!r}"
             else:
-                assert result.stdout == source.encode("utf-8"), f"changed fuzz JSON: {source!r}"
+                assert JSON_TOKENS.findall(output) == JSON_TOKENS.findall(source), \
+                    f"changed fuzz JSON tokens: {source!r}"
         else:
             assert not result.stdout, f"failed fuzz input wrote stdout: {source!r}"
             assert result.stderr, f"failed fuzz input had no explanation: {source!r}"

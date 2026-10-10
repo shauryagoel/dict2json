@@ -5,14 +5,16 @@ use serde_json::{Value, json};
 fn converts_the_supplied_example_in_order() {
     let input = "{'project_name': 'xyz', 'start_time': '2026-10-07 13:00:00+05:30', 'end_time': '2026-10-07 19:00:00+05:30'}";
     let output = convert(input).unwrap();
+    let expected = r#"{"project_name":"xyz", "start_time":"2026-10-07 13:00:00+05:30", "end_time":"2026-10-07 19:00:00+05:30"}"#;
+    assert_eq!(output, expected);
     assert_eq!(
-        output,
-        r#"{"project_name":"xyz","start_time":"2026-10-07 13:00:00+05:30","end_time":"2026-10-07 19:00:00+05:30"}"#
+        convert(r#"{"project_name":"xyz","start_time":"2026-10-07 13:00:00+05:30","end_time":"2026-10-07 19:00:00+05:30"}"#).unwrap(),
+        expected
     );
 }
 
 #[test]
-fn preserves_valid_json_exactly() {
+fn preserves_valid_json_with_no_object_spacing_changes_needed() {
     for input in [
         "{}",
         "  {\"x\": 1, \"x\": 2}\n",
@@ -25,6 +27,41 @@ fn preserves_valid_json_exactly() {
         "{\"x\":\"\\ud800\"}",
     ] {
         assert_eq!(convert(input).unwrap(), input);
+    }
+}
+
+#[test]
+fn normalizes_valid_json_object_separator_spacing() {
+    for (input, expected) in [
+        (
+            "\n{ \"a\" :1,\t \r\n  \"b\":2}\n",
+            "\n{ \"a\" :1, \"b\":2}\n",
+        ),
+        (
+            r#"[{"a":1,"b":2},{"c":3,"d":4},1,2]"#,
+            r#"[{"a":1, "b":2},{"c":3, "d":4},1,2]"#,
+        ),
+        (
+            r#"{"a":1e400,"a":-0,"u":"\ud800","n":1.00}"#,
+            r#"{"a":1e400, "a":-0, "u":"\ud800", "n":1.00}"#,
+        ),
+        (r#"{"only":1}"#, r#"{"only":1}"#),
+        ("{}", "{}"),
+    ] {
+        let output = convert(input).unwrap();
+        assert_eq!(output, expected, "{input:?}");
+        assert_eq!(convert(&output).unwrap(), expected);
+    }
+}
+
+#[test]
+fn spaces_nested_objects_without_changing_arrays_or_string_contents() {
+    let expected = r#"{"a,b":"a,b {\"x\":1,\"y\":2}", "slash\\":"ends with \\", "items":[1,{"a":2, "b":3},[4,5]]}"#;
+    for input in [
+        r#"{'a,b': 'a,b {"x":1,"y":2}', 'slash\\': 'ends with \\', 'items': [1, {'a': 2, 'b': 3}, (4, 5)]}"#,
+        r#"{"a,b":"a,b {\"x\":1,\"y\":2}","slash\\":"ends with \\","items":[1,{"a":2,"b":3},[4,5]]}"#,
+    ] {
+        assert_eq!(convert(input).unwrap(), expected, "{input:?}");
     }
 }
 
@@ -95,7 +132,7 @@ fn preserves_numeric_values_without_truncating_integers() {
 fn duplicate_keys_keep_the_last_value_and_original_position() {
     assert_eq!(
         convert("{'x': 1, 'y': 2, 'x': 3}").unwrap(),
-        r#"{"x":3,"y":2}"#
+        r#"{"x":3, "y":2}"#
     );
 }
 
@@ -132,6 +169,9 @@ fn guards_resource_limits_and_long_expressions() {
     assert!(convert(&" ".repeat(dict2json::MAX_INPUT_BYTES + 1)).is_err());
     let deep_json = "[".repeat(10_000) + "0" + &"]".repeat(10_000);
     assert_eq!(convert(&deep_json).unwrap(), deep_json);
+    let deep_json = "[".repeat(10_000) + r#"{"x":1,"y":2}"# + &"]".repeat(10_000);
+    let expected = "[".repeat(10_000) + r#"{"x":1, "y":2}"# + &"]".repeat(10_000);
+    assert_eq!(convert(&deep_json).unwrap(), expected);
 }
 
 #[test]
