@@ -1,0 +1,9 @@
+[package]
+name = "dict2json"
+version = "0.1.0"
+edition = "2024"
+description = "Safely convert Python dictionary literals to JSON"
+
+[dependencies]
+rustpython-parser = { version = "0.4.0", default-features = false, features = ["num-bigint"] }
+serde_json = { version = "1.0", features = ["arbitrary_precision", "preserve_order", "raw_value"] }
